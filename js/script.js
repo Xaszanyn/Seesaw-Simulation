@@ -34,6 +34,8 @@ import {
 
 import { playWhoosh, playPop, playKeyPress } from "./sound.js";
 
+import { drag, initializeDrag } from "./drag.js";
+
 var state = loadState(); //* { objects, tiltAngle, nextWeight, previewWeight, previewPosition }
 
 function previewNextObject() {
@@ -46,8 +48,8 @@ function previewNextObject() {
 }
 
 (function initialize() {
-  state.objects.map((object) => {
-    createObject(object[0], [object[1], 150], object[2]); //* 150 is initial y value.
+  state.objects.map((object, index) => {
+    createObject(object[0], [object[1], 150], object[2], drag, index); //* 150 is initial y value.
     log(object[0], object[1]);
   });
 
@@ -55,6 +57,8 @@ function previewNextObject() {
   calculateObjectsPosition();
 
   previewNextObject();
+
+  initializeDrag(moveObject);
 
   setTheme(loadTheme());
 })();
@@ -70,7 +74,7 @@ interactionLayer.addEventListener(
   () => (previewObject.style.display = "none")
 );
 
-interactionLayer.addEventListener("click", () => {
+interactionLayer.addEventListener("click", (event) => {
   state.objects.push([
     state.previewWeight,
     state.previewPosition[0],
@@ -79,19 +83,25 @@ interactionLayer.addEventListener("click", () => {
 
   saveState(state);
 
-  createObject(state.previewWeight, state.previewPosition, state.color);
+  createObject(
+    state.previewWeight,
+    state.previewPosition,
+    state.color,
+    drag,
+    state.objects.length - 1
+  );
 
   log(state.previewWeight, state.previewPosition[0]);
 
-  calculateTiltAngle();
   calculateObjectsPosition();
+  calculateTiltAngle(false);
 
   previewNextObject();
 
   playPop();
 });
 
-function calculateTiltAngle() {
+function calculateTiltAngle(instant = true) {
   if (!state.objects.length) return;
 
   let [leftWeight, leftTorque, rightWeight, rightTorque] = state.objects.reduce(
@@ -116,27 +126,48 @@ function calculateTiltAngle() {
   state.tiltAngle =
     Math.round(Math.tanh(Math.log(rightTorque / leftTorque)) * 30 * 100) / 100;
 
-  updateSeesaw(state.tiltAngle);
-  updateTiltAngle(state.tiltAngle);
+  setTimeout(
+    () => {
+      updateSeesaw(state.tiltAngle);
+      updateTiltAngle(state.tiltAngle);
+      calculateObjectsPosition();
+    },
+    instant ? 4 : 250
+  );
 
   saveState(state);
 
   playWhoosh(Math.abs(previousTiltAngle - state.tiltAngle));
 }
 
+function calculateObjectPosition(object) {
+  let top, left, distance;
+
+  distance = Math.min(400, Math.max(0, object.dataset.distance));
+
+  top =
+    Math.sin((state.tiltAngle * Math.PI) / 180) * (distance - 200) -
+    parseInt(object.style.height) / 2;
+  left = Math.cos((state.tiltAngle * Math.PI) / 180) * (distance - 200);
+
+  updateObject(object, top, left);
+}
+
 function calculateObjectsPosition() {
-  let top, left;
+  [...objectContainer.children].map(calculateObjectPosition);
+}
 
-  [...objectContainer.children].map((object) => {
-    top =
-      Math.sin((-state.tiltAngle * Math.PI) / 180) *
-      (200 - object.dataset.distance);
-    left =
-      -Math.cos((-state.tiltAngle * Math.PI) / 180) *
-      (200 - object.dataset.distance);
+function moveObject(object, offset = 0) {
+  object.dataset.distance = Math.min(
+    400,
+    Math.max(0, object.dataset.distance - offset)
+  );
 
-    updateObject(object, top, left);
-  });
+  state.objects[object.dataset.index][1] = object.dataset.distance;
+  saveState(state);
+
+  calculateObjectPosition(object);
+  calculateTiltAngle();
 }
 
 resetButton.addEventListener("click", () => {

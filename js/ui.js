@@ -55,7 +55,7 @@ export function resetAll() {
   logSection.innerHTML = "";
 }
 
-export function createObject(weight, position, color) {
+export function createObject(weight, position, color, drag, index) {
   let object = document.createElement("div");
   object.classList.add("object");
   object.style.width = `${45 + (weight - 1) * 3}px`;
@@ -64,7 +64,9 @@ export function createObject(weight, position, color) {
   object.style.top = `${position[1] - 150}px`;
   object.style.left = `${position[0] - 200}px`;
   object.dataset.distance = position[0];
+  object.dataset.index = index;
   object.style.backgroundColor = color;
+  object.addEventListener("mousedown", drag);
 
   objectContainer.append(object);
 }
@@ -110,4 +112,16 @@ export function movePreviewObject(left, top, weight, tiltAngle) {
       (200 - left) * Math.tan((-tiltAngle * Math.PI) / 180)
     }px`
   );
+}
+
+export function grabObject(object) {
+  object.classList.add("grab");
+  object.style.transition = "border 0.25s, filter 0.25s";
+  object.style.cursor = "grabbing";
+}
+
+export function dropObject(object) {
+  object.classList.remove("grab");
+  object.style.transition = "";
+  object.style.cursor = "";
 }
